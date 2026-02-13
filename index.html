@@ -10,19 +10,25 @@
       --bg:#0b1220; --card:#111a2e; --text:#e8eefc; --muted:#a9b4d0;
       --good:#22c55e; --warn:#f59e0b; --bad:#ef4444; --line:#24314f;
     }
-    body{ margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,system-ui,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;}
+    body{ margin:0; background:var(--bg); color:var(--text);
+      font-family:-apple-system,system-ui,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif; }
     header{ padding:16px 16px 6px; }
     h1{ margin:0; font-size:18px; font-weight:700; letter-spacing:.2px;}
     .sub{ color:var(--muted); font-size:12px; margin-top:4px; }
-    .wrap{ padding:12px 12px 24px; max-width:900px; margin:0 auto; }
+    .wrap{ padding:12px 12px 24px; max-width:980px; margin:0 auto; }
     .grid{ display:grid; grid-template-columns:1fr; gap:12px; }
-    @media (min-width:860px){ .grid{ grid-template-columns:1fr 1fr; } }
-    .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,.25); }
+    @media (min-width:900px){ .grid{ grid-template-columns:1fr 1fr; } }
+    .grid3{ display:grid; grid-template-columns:1fr; gap:12px; margin-top:12px; }
+    @media (min-width:1100px){ .grid3{ grid-template-columns:1fr 1fr 1fr; } }
+
+    .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px;
+      box-shadow:0 6px 18px rgba(0,0,0,.25); }
     .row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
     .pair{ font-size:14px; font-weight:700; }
     .rate{ font-size:22px; font-weight:800; letter-spacing:.2px; }
     .muted{ color:var(--muted); font-size:12px; }
-    .pill{ display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:6px 10px; border-radius:999px; border:1px solid var(--line); }
+    .pill{ display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:6px 10px;
+      border-radius:999px; border:1px solid var(--line); }
     .pill.good{ border-color: rgba(34,197,94,.5); color:#bbf7d0; }
     .pill.warn{ border-color: rgba(245,158,11,.5); color:#fde68a; }
     .pill.bad{ border-color: rgba(239,68,68,.5); color:#fecaca; }
@@ -39,12 +45,16 @@
     .btnrow button{ width:auto; flex:1; }
 
     .chartwrap{ margin-top:10px; }
-    canvas{ width:100% !important; height:260px !important; }
+    canvas{ width:100% !important; height:250px !important; }
 
     .kpi{ margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; }
-    .kpi .k{ background:#0f1730; border:1px solid var(--line); border-radius:12px; padding:10px; min-width:140px; }
+    .kpi .k{ background:#0f1730; border:1px solid var(--line); border-radius:12px; padding:10px; min-width:150px; }
     .k .v{ font-size:16px; font-weight:800; }
     .k .l{ font-size:11px; color:var(--muted); margin-top:2px; }
+
+    .sim{ margin-top:10px; background:#0f1730; border:1px solid var(--line); border-radius:12px; padding:10px; }
+    .sim .title{ font-weight:800; font-size:13px; margin-bottom:6px; }
+    .sim .line{ font-size:12px; color:var(--muted); line-height:1.55; }
 
     .footer{ margin-top:14px; font-size:11px; color:var(--muted); line-height:1.5; }
     a{ color:#9cc2ff; }
@@ -61,11 +71,12 @@
   </header>
 
   <div class="wrap">
+    <!-- Rules / Holdings -->
     <div class="card">
       <div class="row">
         <div>
-          <div class="pair">運用ルール（防衛モード）</div>
-          <div class="muted">「迷わない」ための閾値と分割比率</div>
+          <div class="pair">運用ルール（防衛モード）＋保有額シミュレーション</div>
+          <div class="muted">閾値・分割・手数料・保有額を固定して「迷わない」</div>
         </div>
         <div class="pill" id="ruleSaved">未保存</div>
       </div>
@@ -94,19 +105,38 @@
             <option value="90">90日</option>
           </select>
         </div>
+
+        <div>
+          <label>保有：JPY</label>
+          <input id="holdJPY" type="number" min="0" step="1000" value="0" />
+        </div>
+        <div>
+          <label>保有：USD</label>
+          <input id="holdUSD" type="number" min="0" step="1" value="100" />
+        </div>
+        <div>
+          <label>保有：EUR</label>
+          <input id="holdEUR" type="number" min="0" step="1" value="0" />
+        </div>
+        <div>
+          <label>手数料（スプレッド相当 %）</label>
+          <input id="spreadPct" type="number" min="0" step="0.05" value="0.30" />
+        </div>
       </div>
 
       <div class="btnrow">
-        <button id="save">ルール保存</button>
+        <button id="save">保存</button>
         <button id="reload">更新</button>
       </div>
 
       <div class="footer">
-        データ：Frankfurter（ECB基準の終値ベース、営業日のみ更新）:contentReference[oaicite:1]{index=1}
+        データ：Frankfurter（ECB基準の終値ベース、営業日のみ更新） / 端末保存：localStorage
       </div>
     </div>
 
-    <div class="grid" style="margin-top:12px;">
+    <!-- 3 pairs -->
+    <div class="grid3">
+      <!-- USD/JPY -->
       <div class="card">
         <div class="row">
           <div>
@@ -118,52 +148,83 @@
         <div class="kpi">
           <div class="k"><div class="v" id="usd_dev">—</div><div class="l">長期MA乖離（%）</div></div>
           <div class="k"><div class="v" id="usd_signal">—</div><div class="l">今日の方針</div></div>
-          <div class="k"><div class="v" id="usd_action">—</div><div class="l">動かす目安</div></div>
+          <div class="k"><div class="v" id="usd_action">—</div><div class="l">動かす割合</div></div>
+        </div>
+        <div class="sim">
+          <div class="title">シミュレーション</div>
+          <div class="line" id="usd_sim">—</div>
         </div>
         <div class="chartwrap"><canvas id="usdChart"></canvas></div>
         <div class="footer" id="usd_note"></div>
       </div>
 
+      <!-- EUR/JPY -->
       <div class="card">
         <div class="row">
           <div>
             <div class="pair">EUR/JPY</div>
-            <div class="muted" id="eur_date">—</div>
+            <div class="muted" id="eurjpy_date">—</div>
           </div>
-          <div class="rate" id="eur_rate">—</div>
+          <div class="rate" id="eurjpy_rate">—</div>
         </div>
         <div class="kpi">
-          <div class="k"><div class="v" id="eur_dev">—</div><div class="l">長期MA乖離（%）</div></div>
-          <div class="k"><div class="v" id="eur_signal">—</div><div class="l">今日の方針</div></div>
-          <div class="k"><div class="v" id="eur_action">—</div><div class="l">動かす目安</div></div>
+          <div class="k"><div class="v" id="eurjpy_dev">—</div><div class="l">長期MA乖離（%）</div></div>
+          <div class="k"><div class="v" id="eurjpy_signal">—</div><div class="l">今日の方針</div></div>
+          <div class="k"><div class="v" id="eurjpy_action">—</div><div class="l">動かす割合</div></div>
         </div>
-        <div class="chartwrap"><canvas id="eurChart"></canvas></div>
-        <div class="footer" id="eur_note"></div>
+        <div class="sim">
+          <div class="title">シミュレーション</div>
+          <div class="line" id="eurjpy_sim">—</div>
+        </div>
+        <div class="chartwrap"><canvas id="eurjpyChart"></canvas></div>
+        <div class="footer" id="eurjpy_note"></div>
+      </div>
+
+      <!-- EUR/USD -->
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="pair">EUR/USD</div>
+            <div class="muted" id="eurusd_date">—</div>
+          </div>
+          <div class="rate" id="eurusd_rate">—</div>
+        </div>
+        <div class="kpi">
+          <div class="k"><div class="v" id="eurusd_dev">—</div><div class="l">長期MA乖離（%）</div></div>
+          <div class="k"><div class="v" id="eurusd_signal">—</div><div class="l">今日の方針</div></div>
+          <div class="k"><div class="v" id="eurusd_action">—</div><div class="l">動かす割合</div></div>
+        </div>
+        <div class="sim">
+          <div class="title">シミュレーション</div>
+          <div class="line" id="eurusd_sim">—</div>
+        </div>
+        <div class="chartwrap"><canvas id="eurusdChart"></canvas></div>
+        <div class="footer" id="eurusd_note"></div>
       </div>
     </div>
 
     <div class="card" style="margin-top:12px;">
-      <div class="pair">読み方（アプリの思想）</div>
+      <div class="pair">読み方（防衛の基本）</div>
       <div class="footer">
-        ・乖離が <b>+閾値%</b> 以上：円が相対的に安い（外貨が高い）→ <b>円転を少し検討</b><br/>
-        ・乖離が <b>-閾値%</b> 以下：円が相対的に高い（外貨が安い）→ <b>外貨を少し増やす検討</b><br/>
-        ・それ以外：<b>何もしない</b>（これが防衛運用の勝ち筋）
+        ・乖離が <b>+閾値%</b> 以上：その通貨が“高め”寄り → <b>持ってるなら少し売る（円転/他通貨へ）</b><br/>
+        ・乖離が <b>-閾値%</b> 以下：その通貨が“安め”寄り → <b>余力があるなら少し買う</b><br/>
+        ・それ以外：<b>何もしない</b>（判断疲れの削減が最大のリターン）
       </div>
     </div>
   </div>
 
 <script>
 (() => {
-  const API = "https://api.frankfurter.dev/v1"; // 公開API（キー不要）:contentReference[oaicite:2]{index=2}
-  const LSKEY = "fxdash_rules_v1";
+  const API = "https://api.frankfurter.dev/v1";
+  const LSKEY = "fxdash_rules_v2";
 
-  // ------- helpers -------
+  // --- helpers ---
+  const el = (id) => document.getElementById(id);
   const fmt = (x, d=3) => (x==null || Number.isNaN(x)) ? "—" : Number(x).toFixed(d);
-  const pct = (x, d=1) => (x==null || Number.isNaN(x)) ? "—" : (x*100).toFixed(d) + "%";
-  const mean = arr => arr.reduce((a,b)=>a+b,0)/arr.length;
+
+  function mean(arr){ return arr.reduce((a,b)=>a+b,0)/arr.length; }
 
   function movingAverage(series, window){
-    // series: [{t, v}]
     const out = [];
     const buf = [];
     for (const p of series){
@@ -174,88 +235,168 @@
     return out;
   }
 
-  function classify(devAbsPct, thresholdPct){
-    // devAbsPct: (price - ma)/ma * 100
-    if (devAbsPct == null || Number.isNaN(devAbsPct)) return {label:"データ不足", cls:"warn"};
-    if (devAbsPct >= thresholdPct) return {label:"円転を少し検討", cls:"warn"};
-    if (devAbsPct <= -thresholdPct) return {label:"外貨を少し検討", cls:"good"};
-    return {label:"何もしない", cls:"good"};
+  function setPill(node, text, cls){
+    node.className = "pill " + (cls || "");
+    node.textContent = text;
   }
 
-  function setPill(el, text, cls){
-    el.className = "pill " + (cls || "");
-    el.textContent = text;
-  }
+  function toISO(d){ return d.toISOString().slice(0,10); }
 
-  async function fetchLatest(base){
-    const url = `${API}/latest?base=${encodeURIComponent(base)}&symbols=JPY`;
-    const r = await fetch(url, { cache: "no-store" });
+  async function fetchLatest(base, symbolsCsv){
+    const url = `${API}/latest?base=${encodeURIComponent(base)}&symbols=${encodeURIComponent(symbolsCsv)}`;
+    const r = await fetch(url, { cache:"no-store" });
     if (!r.ok) throw new Error("latest fetch failed");
     return r.json();
   }
 
-  async function fetchSeries(base, days){
-    // Frankfurter: /v1/YYYY-MM-DD..YYYY-MM-DD?base=USD&symbols=JPY :contentReference[oaicite:3]{index=3}
+  async function fetchSeries(base, symbolsCsv, days){
     const end = new Date();
     const start = new Date(end.getTime() - days*24*3600*1000);
-    const toISO = d => d.toISOString().slice(0,10);
-    const url = `${API}/${toISO(start)}..${toISO(end)}?base=${encodeURIComponent(base)}&symbols=JPY`;
-    const r = await fetch(url, { cache: "no-store" });
+    const url = `${API}/${toISO(start)}..${toISO(end)}?base=${encodeURIComponent(base)}&symbols=${encodeURIComponent(symbolsCsv)}`;
+    const r = await fetch(url, { cache:"no-store" });
     if (!r.ok) throw new Error("series fetch failed");
     return r.json();
   }
 
-  function normalizeSeries(json){
-    // json.rates: { "YYYY-MM-DD": { "JPY": 123.45 }, ... }
+  function normalizeSeries(json, symbol){
     const keys = Object.keys(json.rates).sort();
-    return keys.map(k => ({ t: k, v: json.rates[k].JPY }));
+    return keys
+      .filter(k => json.rates[k] && typeof json.rates[k][symbol] === "number")
+      .map(k => ({ t:k, v: json.rates[k][symbol] }));
   }
 
-  // ------- state / UI -------
-  const el = (id) => document.getElementById(id);
-
+  // --- rules / holdings ---
   const ui = {
     status: el("status"),
     days: el("days"),
     threshold: el("threshold"),
     slicePct: el("slicePct"),
     maLong: el("maLong"),
+    holdJPY: el("holdJPY"),
+    holdUSD: el("holdUSD"),
+    holdEUR: el("holdEUR"),
+    spreadPct: el("spreadPct"),
     save: el("save"),
     reload: el("reload"),
     ruleSaved: el("ruleSaved"),
   };
 
   function loadRules(){
-    try {
-      const raw = localStorage.getItem(LSKEY);
-      if (!raw) return null;
-      return JSON.parse(raw);
-    } catch { return null; }
+    try { const raw = localStorage.getItem(LSKEY); return raw ? JSON.parse(raw) : null; }
+    catch { return null; }
   }
-  function saveRules(rules){
-    localStorage.setItem(LSKEY, JSON.stringify(rules));
-  }
-  function applyRulesToUI(r){
-    if (!r) return;
-    ui.days.value = String(r.days);
-    ui.threshold.value = String(r.thresholdPct);
-    ui.slicePct.value = String(r.slicePct);
-    ui.maLong.value = String(r.maLong);
-    setPill(ui.ruleSaved, "保存済み", "good");
-  }
+  function saveRules(r){ localStorage.setItem(LSKEY, JSON.stringify(r)); }
+
   function readRulesFromUI(){
     return {
       days: Number(ui.days.value),
       thresholdPct: Number(ui.threshold.value),
       slicePct: Number(ui.slicePct.value),
       maLong: Number(ui.maLong.value),
+      holdJPY: Number(ui.holdJPY.value),
+      holdUSD: Number(ui.holdUSD.value),
+      holdEUR: Number(ui.holdEUR.value),
+      spreadPct: Number(ui.spreadPct.value),
     };
   }
 
-  // ------- charts -------
-  let usdChart, eurChart;
+  function applyRulesToUI(r){
+    if (!r) return;
+    ui.days.value = String(r.days ?? 180);
+    ui.threshold.value = String(r.thresholdPct ?? 3.0);
+    ui.slicePct.value = String(r.slicePct ?? 25);
+    ui.maLong.value = String(r.maLong ?? 60);
+    ui.holdJPY.value = String(r.holdJPY ?? 0);
+    ui.holdUSD.value = String(r.holdUSD ?? 100);
+    ui.holdEUR.value = String(r.holdEUR ?? 0);
+    ui.spreadPct.value = String(r.spreadPct ?? 0.30);
+    setPill(ui.ruleSaved, "保存済み", "good");
+  }
 
-  function makeChart(canvas, labels, price, ma20, maLong){
+  // --- decision logic ---
+  // devPct = (price - maLong)/maLong * 100
+  // +threshold => “高め” => 持ってるなら売る寄り
+  // -threshold => “安め” => 余力あれば買う寄り
+  function classify(devPct, thr){
+    if (devPct == null || Number.isNaN(devPct)) return { label:"データ不足", cls:"warn", mode:"none" };
+    if (devPct >= thr) return { label:"高め → 少し売る検討", cls:"warn", mode:"sell" };
+    if (devPct <= -thr) return { label:"安め → 少し買う検討", cls:"good", mode:"buy" };
+    return { label:"何もしない", cls:"good", mode:"hold" };
+  }
+
+  // spread model (very rough):
+  // foreign->JPY sell: effective rate = rate*(1 - s)
+  // JPY->foreign buy : effective rate = rate*(1 + s)  (you pay worse)
+  function effSellRate(rate, sPct){ return rate * (1 - sPct/100); }
+  function effBuyRate(rate, sPct){ return rate * (1 + sPct/100); }
+
+  function simUSDJPY(rate, decision, rules){
+    const s = rules.spreadPct;
+    const slice = rules.slicePct / 100;
+    const usd = rules.holdUSD;
+    const jpy = rules.holdJPY;
+
+    if (decision.mode === "sell"){
+      const usdMove = usd * slice;
+      const jpyGain = usdMove * effSellRate(rate, s);
+      return `USD ${usdMove.toFixed(2)} を円転 → 約 ${Math.round(jpyGain).toLocaleString()} 円（スプレッド ${s}% 想定）`;
+    }
+    if (decision.mode === "buy"){
+      const jpyMove = jpy * slice;
+      if (jpyMove <= 0) return `円が0円なので買いシミュレーション不可（保有JPYを入力してね）`;
+      const usdGet = jpyMove / effBuyRate(rate, s);
+      return `JPY ${Math.round(jpyMove).toLocaleString()} でUSD購入 → 約 ${usdGet.toFixed(2)} USD（スプレッド ${s}% 想定）`;
+    }
+    return `条件未満 → 取引しない（迷いを減らすのが勝ち）`;
+  }
+
+  function simEURJPY(rate, decision, rules){
+    const s = rules.spreadPct;
+    const slice = rules.slicePct / 100;
+    const eur = rules.holdEUR;
+    const jpy = rules.holdJPY;
+
+    if (decision.mode === "sell"){
+      const eurMove = eur * slice;
+      const jpyGain = eurMove * effSellRate(rate, s);
+      return `EUR ${eurMove.toFixed(2)} を円転 → 約 ${Math.round(jpyGain).toLocaleString()} 円（スプレッド ${s}% 想定）`;
+    }
+    if (decision.mode === "buy"){
+      const jpyMove = jpy * slice;
+      if (jpyMove <= 0) return `円が0円なので買いシミュレーション不可（保有JPYを入力してね）`;
+      const eurGet = jpyMove / effBuyRate(rate, s);
+      return `JPY ${Math.round(jpyMove).toLocaleString()} でEUR購入 → 約 ${eurGet.toFixed(2)} EUR（スプレッド ${s}% 想定）`;
+    }
+    return `条件未満 → 取引しない（迷いを減らすのが勝ち）`;
+  }
+
+  // EUR/USD: rate = USD per EUR
+  // If "sell" (EUR high): sell EUR->USD
+  // If "buy"  (EUR low): buy EUR with USD (USD->EUR)
+  function simEURUSD(rate, decision, rules){
+    const s = rules.spreadPct;
+    const slice = rules.slicePct / 100;
+    const eur = rules.holdEUR;
+    const usd = rules.holdUSD;
+
+    if (decision.mode === "sell"){
+      const eurMove = eur * slice;
+      const usdGain = eurMove * effSellRate(rate, s);
+      return `EUR ${eurMove.toFixed(2)} をUSDへ → 約 ${usdGain.toFixed(2)} USD（スプレッド ${s}% 想定）`;
+    }
+    if (decision.mode === "buy"){
+      const usdMove = usd * slice;
+      if (usdMove <= 0) return `USDが0なので買いシミュレーション不可（保有USDを入力してね）`;
+      const eurGet = usdMove / effBuyRate(rate, s);
+      return `USD ${usdMove.toFixed(2)} でEUR購入 → 約 ${eurGet.toFixed(2)} EUR（スプレッド ${s}% 想定）`;
+    }
+    return `条件未満 → 取引しない（迷いを減らすのが勝ち）`;
+  }
+
+  // --- charts ---
+  let usdChart, eurjpyChart, eurusdChart;
+
+  function makeChart(canvas, labels, price, ma20, maL, longW){
     const ctx = canvas.getContext("2d");
     return new Chart(ctx, {
       type: "line",
@@ -264,7 +405,7 @@
         datasets: [
           { label: "レート", data: price, tension: 0.15, pointRadius: 0 },
           { label: "MA20", data: ma20, tension: 0.15, pointRadius: 0 },
-          { label: `MA${maLong.length ? maLong.length : ""}`, data: maLong, tension: 0.15, pointRadius: 0 },
+          { label: `MA${longW}`, data: maL, tension: 0.15, pointRadius: 0 },
         ]
       },
       options: {
@@ -279,103 +420,158 @@
     });
   }
 
-  function updateOrCreateChart(which, labels, price, ma20, maLongArr){
-    const canvas = el(which === "USD" ? "usdChart" : "eurChart");
-    const existing = which === "USD" ? usdChart : eurChart;
+  function updateChart(which, labels, price, ma20, maL, longW){
+    const map = {
+      usd: { canvas: el("usdChart"), ref: () => usdChart, set: (c)=>usdChart=c },
+      eurjpy: { canvas: el("eurjpyChart"), ref: () => eurjpyChart, set: (c)=>eurjpyChart=c },
+      eurusd: { canvas: el("eurusdChart"), ref: () => eurusdChart, set: (c)=>eurusdChart=c },
+    };
+    const slot = map[which];
+    const existing = slot.ref();
     if (!existing){
-      const ch = makeChart(canvas, labels, price, ma20, maLongArr);
-      if (which === "USD") usdChart = ch; else eurChart = ch;
+      const ch = makeChart(slot.canvas, labels, price, ma20, maL, longW);
+      slot.set(ch);
       return;
     }
     existing.data.labels = labels;
     existing.data.datasets[0].data = price;
     existing.data.datasets[1].data = ma20;
-    existing.data.datasets[2].data = maLongArr;
+    existing.data.datasets[2].data = maL;
+    existing.data.datasets[2].label = `MA${longW}`;
     existing.update();
   }
 
-  // ------- main render -------
-  async function renderPair(pairKey, base){
-    const rules = readRulesFromUI();
-    const days = rules.days;
-    const thresholdPct = rules.thresholdPct;
-    const slicePct = rules.slicePct;
-    const longW = rules.maLong;
+  // --- render pairs ---
+  async function renderUSDJPY(rules){
+    const days = rules.days, longW = rules.maLong, thr = rules.thresholdPct;
 
-    // latest
-    const latest = await fetchLatest(base);
-    const latestRate = latest.rates.JPY; // base -> JPY
+    const latest = await fetchLatest("USD", "JPY");
+    const rate = latest.rates.JPY;
     const latestDate = latest.date;
 
-    // series
-    const seriesJson = await fetchSeries(base, days);
-    const series = normalizeSeries(seriesJson);
-    const labels = series.map(p => p.t);
-    const price = series.map(p => p.v);
-
+    const seriesJson = await fetchSeries("USD", "JPY", days);
+    const series = normalizeSeries(seriesJson, "JPY");
+    const labels = series.map(p=>p.t);
+    const price  = series.map(p=>p.v);
     const ma20 = movingAverage(series, 20);
     const maL  = movingAverage(series, longW);
+    const lastPrice = price.at(-1);
+    const lastMaL = maL.at(-1);
+    const devPct = (lastMaL==null) ? null : ((lastPrice-lastMaL)/lastMaL)*100;
 
-    const lastPrice = price[price.length - 1];
-    const lastMaL = maL[maL.length - 1];
+    const decision = classify(devPct, thr);
 
-    const devPct = (lastMaL == null) ? null : ((lastPrice - lastMaL) / lastMaL) * 100;
-    const decision = classify(devPct, thresholdPct);
+    el("usd_rate").textContent = fmt(rate, 3);
+    el("usd_date").textContent = `更新日: ${latestDate}`;
+    el("usd_dev").textContent = (devPct==null) ? "—" : devPct.toFixed(1)+"%";
+    el("usd_signal").textContent = decision.label;
+    el("usd_action").textContent = `${rules.slicePct}%`;
+    el("usd_note").textContent = `長期MA(${longW}日)基準。乖離が ±${thr}% を超えたら分割で動かす（スプレッド ${rules.spreadPct}% 想定）。`;
+    el("usd_sim").textContent = simUSDJPY(rate, decision, rules);
 
-    const devText = (devPct == null) ? "—" : devPct.toFixed(1) + "%";
-    const actionText = `${slicePct}% だけ`;
+    updateChart("usd", labels, price, ma20, maL, longW);
+    return latestDate;
+  }
 
-    if (pairKey === "USD"){
-      el("usd_rate").textContent = fmt(latestRate, 3);
-      el("usd_date").textContent = `更新日: ${latestDate}`;
-      el("usd_dev").textContent = devText;
-      el("usd_signal").textContent = decision.label;
-      el("usd_action").textContent = actionText;
-      el("usd_note").textContent = `長期MA(${longW}日)基準。乖離が ±${thresholdPct}% を超えたら分割で動かす。`;
-      updateOrCreateChart("USD", labels, price, ma20, maL);
-    } else {
-      el("eur_rate").textContent = fmt(latestRate, 3);
-      el("eur_date").textContent = `更新日: ${latestDate}`;
-      el("eur_dev").textContent = devText;
-      el("eur_signal").textContent = decision.label;
-      el("eur_action").textContent = actionText;
-      el("eur_note").textContent = `長期MA(${longW}日)基準。乖離が ±${thresholdPct}% を超えたら分割で動かす。`;
-      updateOrCreateChart("EUR", labels, price, ma20, maL);
-    }
+  async function renderEURJPY(rules){
+    const days = rules.days, longW = rules.maLong, thr = rules.thresholdPct;
 
-    return { latestDate };
+    const latest = await fetchLatest("EUR", "JPY");
+    const rate = latest.rates.JPY;
+    const latestDate = latest.date;
+
+    const seriesJson = await fetchSeries("EUR", "JPY", days);
+    const series = normalizeSeries(seriesJson, "JPY");
+    const labels = series.map(p=>p.t);
+    const price  = series.map(p=>p.v);
+    const ma20 = movingAverage(series, 20);
+    const maL  = movingAverage(series, longW);
+    const lastPrice = price.at(-1);
+    const lastMaL = maL.at(-1);
+    const devPct = (lastMaL==null) ? null : ((lastPrice-lastMaL)/lastMaL)*100;
+
+    const decision = classify(devPct, thr);
+
+    el("eurjpy_rate").textContent = fmt(rate, 3);
+    el("eurjpy_date").textContent = `更新日: ${latestDate}`;
+    el("eurjpy_dev").textContent = (devPct==null) ? "—" : devPct.toFixed(1)+"%";
+    el("eurjpy_signal").textContent = decision.label;
+    el("eurjpy_action").textContent = `${rules.slicePct}%`;
+    el("eurjpy_note").textContent = `長期MA(${longW}日)基準。乖離が ±${thr}% を超えたら分割で動かす（スプレッド ${rules.spreadPct}% 想定）。`;
+    el("eurjpy_sim").textContent = simEURJPY(rate, decision, rules);
+
+    updateChart("eurjpy", labels, price, ma20, maL, longW);
+    return latestDate;
+  }
+
+  async function renderEURUSD(rules){
+    const days = rules.days, longW = rules.maLong, thr = rules.thresholdPct;
+
+    // EUR/USD = base EUR, symbol USD
+    const latest = await fetchLatest("EUR", "USD");
+    const rate = latest.rates.USD;
+    const latestDate = latest.date;
+
+    const seriesJson = await fetchSeries("EUR", "USD", days);
+    const series = normalizeSeries(seriesJson, "USD");
+    const labels = series.map(p=>p.t);
+    const price  = series.map(p=>p.v);
+    const ma20 = movingAverage(series, 20);
+    const maL  = movingAverage(series, longW);
+    const lastPrice = price.at(-1);
+    const lastMaL = maL.at(-1);
+    const devPct = (lastMaL==null) ? null : ((lastPrice-lastMaL)/lastMaL)*100;
+
+    // 解釈（防衛）：EUR/USDが高め=EURが強い→EUR持ってるならUSDに寄せる検討
+    //               EUR/USDが安め=EURが弱い→USD持ってるならEURに寄せる検討
+    const decision = classify(devPct, thr);
+
+    el("eurusd_rate").textContent = fmt(rate, 4);
+    el("eurusd_date").textContent = `更新日: ${latestDate}`;
+    el("eurusd_dev").textContent = (devPct==null) ? "—" : devPct.toFixed(1)+"%";
+    el("eurusd_signal").textContent = decision.label;
+    el("eurusd_action").textContent = `${rules.slicePct}%`;
+    el("eurusd_note").textContent =
+      `長期MA(${longW}日)基準。高め→EUR→USD、安め→USD→EUR の分割リバランス（スプレッド ${rules.spreadPct}% 想定）。`;
+    el("eurusd_sim").textContent = simEURUSD(rate, decision, rules);
+
+    updateChart("eurusd", labels, price, ma20, maL, longW);
+    return latestDate;
   }
 
   async function renderAll(){
     ui.status.textContent = "更新中…";
     const t0 = performance.now();
-    try {
-      const [usd, eur] = await Promise.all([
-        renderPair("USD", "USD"),
-        renderPair("EUR", "EUR")
+    try{
+      const rules = readRulesFromUI();
+      const [d1, d2, d3] = await Promise.all([
+        renderUSDJPY(rules),
+        renderEURJPY(rules),
+        renderEURUSD(rules),
       ]);
       const t1 = performance.now();
-      ui.status.textContent = `OK（USD/EUR 更新日: ${usd.latestDate} / ${eur.latestDate}）・表示まで ${(t1 - t0).toFixed(0)}ms`;
-    } catch (e){
+      ui.status.textContent = `OK（更新日: USD/JPY=${d1}, EUR/JPY=${d2}, EUR/USD=${d3}）・${(t1-t0).toFixed(0)}ms`;
+    } catch(e){
       console.error(e);
-      ui.status.textContent = "取得に失敗しました。電波状況 or API応答を確認してください。";
+      ui.status.textContent = "取得に失敗しました（電波状況 or API応答）";
     }
   }
 
-  // ------- init -------
+  // init
   const stored = loadRules();
   if (stored) applyRulesToUI(stored);
 
   ui.save.addEventListener("click", () => {
-    const r = readRulesFromUI();
-    saveRules(r);
+    const rules = readRulesFromUI();
+    saveRules(rules);
     setPill(ui.ruleSaved, "保存済み", "good");
+    renderAll();
   });
 
   ui.reload.addEventListener("click", () => renderAll());
 
-  // ルール変更時に「未保存」に戻す（うっかり防止）
-  ["days","threshold","slicePct","maLong"].forEach(id => {
+  // mark unsaved on change
+  ["days","threshold","slicePct","maLong","holdJPY","holdUSD","holdEUR","spreadPct"].forEach(id => {
     el(id).addEventListener("change", () => setPill(ui.ruleSaved, "未保存", "warn"));
     el(id).addEventListener("input",  () => setPill(ui.ruleSaved, "未保存", "warn"));
   });
