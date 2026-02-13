@@ -16,8 +16,6 @@
     h1{ margin:0; font-size:18px; font-weight:700; letter-spacing:.2px;}
     .sub{ color:var(--muted); font-size:12px; margin-top:4px; }
     .wrap{ padding:12px 12px 24px; max-width:980px; margin:0 auto; }
-    .grid{ display:grid; grid-template-columns:1fr; gap:12px; }
-    @media (min-width:900px){ .grid{ grid-template-columns:1fr 1fr; } }
     .grid3{ display:grid; grid-template-columns:1fr; gap:12px; margin-top:12px; }
     @media (min-width:1100px){ .grid3{ grid-template-columns:1fr 1fr 1fr; } }
 
@@ -41,6 +39,7 @@
     }
     button{ cursor:pointer; background:#13214a; font-weight:700; }
     button:active{ transform: translateY(1px); }
+    button:disabled{ opacity:.45; cursor:not-allowed; }
     .btnrow{ display:flex; gap:10px; margin-top:10px; }
     .btnrow button{ width:auto; flex:1; }
 
@@ -75,8 +74,8 @@
     <div class="card">
       <div class="row">
         <div>
-          <div class="pair">運用ルール（防衛モード）＋保有額シミュレーション</div>
-          <div class="muted">閾値・分割・手数料・保有額を固定して「迷わない」</div>
+          <div class="pair">運用ルール（防衛モード）＋保有額シミュレーション＋クールダウン</div>
+          <div class="muted">閾値・分割・手数料・保有額・クールダウンを固定して「迷わない」</div>
         </div>
         <div class="pill" id="ruleSaved">未保存</div>
       </div>
@@ -122,6 +121,14 @@
           <label>手数料（スプレッド相当 %）</label>
           <input id="spreadPct" type="number" min="0" step="0.05" value="0.30" />
         </div>
+        <div>
+          <label>クールダウン（日）</label>
+          <input id="cooldownDays" type="number" min="0" step="1" value="7" />
+        </div>
+        <div>
+          <label>（予備）</label>
+          <input disabled value=" " />
+        </div>
       </div>
 
       <div class="btnrow">
@@ -153,6 +160,10 @@
         <div class="sim">
           <div class="title">シミュレーション</div>
           <div class="line" id="usd_sim">—</div>
+          <div class="btnrow" style="margin-top:10px;">
+            <button id="usd_exec">実行した（記録）</button>
+          </div>
+          <div class="footer" id="usd_cd">—</div>
         </div>
         <div class="chartwrap"><canvas id="usdChart"></canvas></div>
         <div class="footer" id="usd_note"></div>
@@ -175,6 +186,10 @@
         <div class="sim">
           <div class="title">シミュレーション</div>
           <div class="line" id="eurjpy_sim">—</div>
+          <div class="btnrow" style="margin-top:10px;">
+            <button id="eurjpy_exec">実行した（記録）</button>
+          </div>
+          <div class="footer" id="eurjpy_cd">—</div>
         </div>
         <div class="chartwrap"><canvas id="eurjpyChart"></canvas></div>
         <div class="footer" id="eurjpy_note"></div>
@@ -197,6 +212,10 @@
         <div class="sim">
           <div class="title">シミュレーション</div>
           <div class="line" id="eurusd_sim">—</div>
+          <div class="btnrow" style="margin-top:10px;">
+            <button id="eurusd_exec">実行した（記録）</button>
+          </div>
+          <div class="footer" id="eurusd_cd">—</div>
         </div>
         <div class="chartwrap"><canvas id="eurusdChart"></canvas></div>
         <div class="footer" id="eurusd_note"></div>
@@ -216,7 +235,8 @@
 <script>
 (() => {
   const API = "https://api.frankfurter.dev/v1";
-  const LSKEY = "fxdash_rules_v2";
+  const LSKEY = "fxdash_rules_v3";
+  const LSEXEC = "fxdash_exec_v1"; // 最終実行日の保存
 
   // --- helpers ---
   const el = (id) => document.getElementById(id);
@@ -265,6 +285,64 @@
       .map(k => ({ t:k, v: json.rates[k][symbol] }));
   }
 
+  // --- exec (cooldown) storage ---
+  function loadExec(){
+    try { const raw = localStorage.getItem(LSEXEC); return raw ? JSON.parse(raw) : {}; }
+    catch { return {}; }
+  }
+  function saveExec(obj){
+    localStorage.setItem(LSEXEC, JSON.stringify(obj));
+  }
+  function todayISO(){
+    const d = new Date();
+    return d.toISOString().slice(0,10);
+  }
+  function daysBetweenISO(a, b){
+    const da = new Date(a + "T00:00:00");
+    const db = new Date(b + "T00:00:00");
+    return Math.floor((db - da) / (24*3600*1000));
+  }
+  function cooldownInfo(pairKey, cooldownDays){
+    const exec = loadExec();
+    const last = exec[pairKey] || null;
+    if (!last || cooldownDays <= 0){
+      return { inCooldown:false, last:null, remaining:0 };
+    }
+    const passed = daysBetweenISO(last, todayISO());
+    const remaining = Math.max(0, cooldownDays - passed);
+    return { inCooldown: remaining > 0, last, remaining };
+  }
+  function renderCooldown(pairKey, cooldownDays, footerElId, buttonElId){
+    const info = cooldownInfo(pairKey, cooldownDays);
+    const f = el(footerElId);
+    const b = el(buttonElId);
+    if (!f || !b) return info;
+
+    if (!info.last){
+      f.textContent = "未実行（記録なし）";
+      b.disabled = false;
+      return info;
+    }
+    if (info.inCooldown){
+      f.textContent = `最終実行: ${info.last} / クールダウン中（残り ${info.remaining} 日）`;
+      b.disabled = true;
+    } else {
+      f.textContent = `最終実行: ${info.last} / クールダウン終了`;
+      b.disabled = false;
+    }
+    return info;
+  }
+  function bindExecButton(pairKey, buttonElId){
+    const b = el(buttonElId);
+    if (!b) return;
+    b.addEventListener("click", () => {
+      const exec = loadExec();
+      exec[pairKey] = todayISO();
+      saveExec(exec);
+      renderAll();
+    });
+  }
+
   // --- rules / holdings ---
   const ui = {
     status: el("status"),
@@ -276,6 +354,7 @@
     holdUSD: el("holdUSD"),
     holdEUR: el("holdEUR"),
     spreadPct: el("spreadPct"),
+    cooldownDays: el("cooldownDays"),
     save: el("save"),
     reload: el("reload"),
     ruleSaved: el("ruleSaved"),
@@ -297,6 +376,7 @@
       holdUSD: Number(ui.holdUSD.value),
       holdEUR: Number(ui.holdEUR.value),
       spreadPct: Number(ui.spreadPct.value),
+      cooldownDays: Number(ui.cooldownDays.value),
     };
   }
 
@@ -310,13 +390,11 @@
     ui.holdUSD.value = String(r.holdUSD ?? 100);
     ui.holdEUR.value = String(r.holdEUR ?? 0);
     ui.spreadPct.value = String(r.spreadPct ?? 0.30);
+    ui.cooldownDays.value = String(r.cooldownDays ?? 7);
     setPill(ui.ruleSaved, "保存済み", "good");
   }
 
   // --- decision logic ---
-  // devPct = (price - maLong)/maLong * 100
-  // +threshold => “高め” => 持ってるなら売る寄り
-  // -threshold => “安め” => 余力あれば買う寄り
   function classify(devPct, thr){
     if (devPct == null || Number.isNaN(devPct)) return { label:"データ不足", cls:"warn", mode:"none" };
     if (devPct >= thr) return { label:"高め → 少し売る検討", cls:"warn", mode:"sell" };
@@ -324,11 +402,19 @@
     return { label:"何もしない", cls:"good", mode:"hold" };
   }
 
-  // spread model (very rough):
-  // foreign->JPY sell: effective rate = rate*(1 - s)
-  // JPY->foreign buy : effective rate = rate*(1 + s)  (you pay worse)
+  // spread model (rough)
   function effSellRate(rate, sPct){ return rate * (1 - sPct/100); }
   function effBuyRate(rate, sPct){ return rate * (1 + sPct/100); }
+
+  // Apply cooldown as a “hard stop” on action:
+  // If in cooldown => force hold (but keep the underlying devPct display)
+  function applyCooldownToDecision(pairKey, decision, rules){
+    const info = cooldownInfo(pairKey, rules.cooldownDays);
+    if (info.inCooldown){
+      return { ...decision, mode:"hold", label:`クールダウン中 → 何もしない（残り${info.remaining}日）`, cls:"good" };
+    }
+    return decision;
+  }
 
   function simUSDJPY(rate, decision, rules){
     const s = rules.spreadPct;
@@ -347,7 +433,7 @@
       const usdGet = jpyMove / effBuyRate(rate, s);
       return `JPY ${Math.round(jpyMove).toLocaleString()} でUSD購入 → 約 ${usdGet.toFixed(2)} USD（スプレッド ${s}% 想定）`;
     }
-    return `条件未満 → 取引しない（迷いを減らすのが勝ち）`;
+    return `条件未満 or クールダウン → 取引しない（迷いを減らすのが勝ち）`;
   }
 
   function simEURJPY(rate, decision, rules){
@@ -367,12 +453,10 @@
       const eurGet = jpyMove / effBuyRate(rate, s);
       return `JPY ${Math.round(jpyMove).toLocaleString()} でEUR購入 → 約 ${eurGet.toFixed(2)} EUR（スプレッド ${s}% 想定）`;
     }
-    return `条件未満 → 取引しない（迷いを減らすのが勝ち）`;
+    return `条件未満 or クールダウン → 取引しない（迷いを減らすのが勝ち）`;
   }
 
   // EUR/USD: rate = USD per EUR
-  // If "sell" (EUR high): sell EUR->USD
-  // If "buy"  (EUR low): buy EUR with USD (USD->EUR)
   function simEURUSD(rate, decision, rules){
     const s = rules.spreadPct;
     const slice = rules.slicePct / 100;
@@ -390,7 +474,7 @@
       const eurGet = usdMove / effBuyRate(rate, s);
       return `USD ${usdMove.toFixed(2)} でEUR購入 → 約 ${eurGet.toFixed(2)} EUR（スプレッド ${s}% 想定）`;
     }
-    return `条件未満 → 取引しない（迷いを減らすのが勝ち）`;
+    return `条件未満 or クールダウン → 取引しない（迷いを減らすのが勝ち）`;
   }
 
   // --- charts ---
@@ -459,14 +543,15 @@
     const lastMaL = maL.at(-1);
     const devPct = (lastMaL==null) ? null : ((lastPrice-lastMaL)/lastMaL)*100;
 
-    const decision = classify(devPct, thr);
+    let decision = classify(devPct, thr);
+    decision = applyCooldownToDecision("USDJPY", decision, rules);
 
     el("usd_rate").textContent = fmt(rate, 3);
     el("usd_date").textContent = `更新日: ${latestDate}`;
     el("usd_dev").textContent = (devPct==null) ? "—" : devPct.toFixed(1)+"%";
     el("usd_signal").textContent = decision.label;
     el("usd_action").textContent = `${rules.slicePct}%`;
-    el("usd_note").textContent = `長期MA(${longW}日)基準。乖離が ±${thr}% を超えたら分割で動かす（スプレッド ${rules.spreadPct}% 想定）。`;
+    el("usd_note").textContent = `長期MA(${longW}日)基準。乖離が ±${thr}% を超えたら分割で動かす（スプレッド ${rules.spreadPct}% / クールダウン ${rules.cooldownDays}日）。`;
     el("usd_sim").textContent = simUSDJPY(rate, decision, rules);
 
     updateChart("usd", labels, price, ma20, maL, longW);
@@ -490,14 +575,15 @@
     const lastMaL = maL.at(-1);
     const devPct = (lastMaL==null) ? null : ((lastPrice-lastMaL)/lastMaL)*100;
 
-    const decision = classify(devPct, thr);
+    let decision = classify(devPct, thr);
+    decision = applyCooldownToDecision("EURJPY", decision, rules);
 
     el("eurjpy_rate").textContent = fmt(rate, 3);
     el("eurjpy_date").textContent = `更新日: ${latestDate}`;
     el("eurjpy_dev").textContent = (devPct==null) ? "—" : devPct.toFixed(1)+"%";
     el("eurjpy_signal").textContent = decision.label;
     el("eurjpy_action").textContent = `${rules.slicePct}%`;
-    el("eurjpy_note").textContent = `長期MA(${longW}日)基準。乖離が ±${thr}% を超えたら分割で動かす（スプレッド ${rules.spreadPct}% 想定）。`;
+    el("eurjpy_note").textContent = `長期MA(${longW}日)基準。乖離が ±${thr}% を超えたら分割で動かす（スプレッド ${rules.spreadPct}% / クールダウン ${rules.cooldownDays}日）。`;
     el("eurjpy_sim").textContent = simEURJPY(rate, decision, rules);
 
     updateChart("eurjpy", labels, price, ma20, maL, longW);
@@ -507,7 +593,6 @@
   async function renderEURUSD(rules){
     const days = rules.days, longW = rules.maLong, thr = rules.thresholdPct;
 
-    // EUR/USD = base EUR, symbol USD
     const latest = await fetchLatest("EUR", "USD");
     const rate = latest.rates.USD;
     const latestDate = latest.date;
@@ -522,9 +607,8 @@
     const lastMaL = maL.at(-1);
     const devPct = (lastMaL==null) ? null : ((lastPrice-lastMaL)/lastMaL)*100;
 
-    // 解釈（防衛）：EUR/USDが高め=EURが強い→EUR持ってるならUSDに寄せる検討
-    //               EUR/USDが安め=EURが弱い→USD持ってるならEURに寄せる検討
-    const decision = classify(devPct, thr);
+    let decision = classify(devPct, thr);
+    decision = applyCooldownToDecision("EURUSD", decision, rules);
 
     el("eurusd_rate").textContent = fmt(rate, 4);
     el("eurusd_date").textContent = `更新日: ${latestDate}`;
@@ -532,7 +616,7 @@
     el("eurusd_signal").textContent = decision.label;
     el("eurusd_action").textContent = `${rules.slicePct}%`;
     el("eurusd_note").textContent =
-      `長期MA(${longW}日)基準。高め→EUR→USD、安め→USD→EUR の分割リバランス（スプレッド ${rules.spreadPct}% 想定）。`;
+      `長期MA(${longW}日)基準。高め→EUR→USD、安め→USD→EUR の分割リバランス（スプレッド ${rules.spreadPct}% / クールダウン ${rules.cooldownDays}日）。`;
     el("eurusd_sim").textContent = simEURUSD(rate, decision, rules);
 
     updateChart("eurusd", labels, price, ma20, maL, longW);
@@ -544,6 +628,12 @@
     const t0 = performance.now();
     try{
       const rules = readRulesFromUI();
+
+      // update cooldown UI (button disable + remaining days)
+      renderCooldown("USDJPY", rules.cooldownDays, "usd_cd", "usd_exec");
+      renderCooldown("EURJPY", rules.cooldownDays, "eurjpy_cd", "eurjpy_exec");
+      renderCooldown("EURUSD", rules.cooldownDays, "eurusd_cd", "eurusd_exec");
+
       const [d1, d2, d3] = await Promise.all([
         renderUSDJPY(rules),
         renderEURJPY(rules),
@@ -561,6 +651,11 @@
   const stored = loadRules();
   if (stored) applyRulesToUI(stored);
 
+  // bind exec buttons
+  bindExecButton("USDJPY", "usd_exec");
+  bindExecButton("EURJPY", "eurjpy_exec");
+  bindExecButton("EURUSD", "eurusd_exec");
+
   ui.save.addEventListener("click", () => {
     const rules = readRulesFromUI();
     saveRules(rules);
@@ -571,7 +666,7 @@
   ui.reload.addEventListener("click", () => renderAll());
 
   // mark unsaved on change
-  ["days","threshold","slicePct","maLong","holdJPY","holdUSD","holdEUR","spreadPct"].forEach(id => {
+  ["days","threshold","slicePct","maLong","holdJPY","holdUSD","holdEUR","spreadPct","cooldownDays"].forEach(id => {
     el(id).addEventListener("change", () => setPill(ui.ruleSaved, "未保存", "warn"));
     el(id).addEventListener("input",  () => setPill(ui.ruleSaved, "未保存", "warn"));
   });
