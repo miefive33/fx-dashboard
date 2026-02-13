@@ -4,9 +4,384 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>FX Dashboard</title>
+  <meta name="theme-color" content="#0b1220" />
+  <style>
+    :root{
+      --bg:#0b1220; --card:#111a2e; --text:#e8eefc; --muted:#a9b4d0;
+      --good:#22c55e; --warn:#f59e0b; --bad:#ef4444; --line:#24314f;
+    }
+    body{ margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,system-ui,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;}
+    header{ padding:16px 16px 6px; }
+    h1{ margin:0; font-size:18px; font-weight:700; letter-spacing:.2px;}
+    .sub{ color:var(--muted); font-size:12px; margin-top:4px; }
+    .wrap{ padding:12px 12px 24px; max-width:900px; margin:0 auto; }
+    .grid{ display:grid; grid-template-columns:1fr; gap:12px; }
+    @media (min-width:860px){ .grid{ grid-template-columns:1fr 1fr; } }
+    .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,.25); }
+    .row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .pair{ font-size:14px; font-weight:700; }
+    .rate{ font-size:22px; font-weight:800; letter-spacing:.2px; }
+    .muted{ color:var(--muted); font-size:12px; }
+    .pill{ display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:6px 10px; border-radius:999px; border:1px solid var(--line); }
+    .pill.good{ border-color: rgba(34,197,94,.5); color:#bbf7d0; }
+    .pill.warn{ border-color: rgba(245,158,11,.5); color:#fde68a; }
+    .pill.bad{ border-color: rgba(239,68,68,.5); color:#fecaca; }
+
+    .controls{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+    .controls label{ display:block; font-size:12px; color:var(--muted); margin-bottom:6px;}
+    input, select, button{
+      width:100%; box-sizing:border-box; border-radius:12px; border:1px solid var(--line);
+      background:#0f1730; color:var(--text); padding:10px 12px; font-size:14px;
+    }
+    button{ cursor:pointer; background:#13214a; font-weight:700; }
+    button:active{ transform: translateY(1px); }
+    .btnrow{ display:flex; gap:10px; margin-top:10px; }
+    .btnrow button{ width:auto; flex:1; }
+
+    .chartwrap{ margin-top:10px; }
+    canvas{ width:100% !important; height:260px !important; }
+
+    .kpi{ margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; }
+    .kpi .k{ background:#0f1730; border:1px solid var(--line); border-radius:12px; padding:10px; min-width:140px; }
+    .k .v{ font-size:16px; font-weight:800; }
+    .k .l{ font-size:11px; color:var(--muted); margin-top:2px; }
+
+    .footer{ margin-top:14px; font-size:11px; color:var(--muted); line-height:1.5; }
+    a{ color:#9cc2ff; }
+  </style>
+
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
-<body style="font-family: -apple-system, system-ui; padding: 16px;">
-  <h1>FX Dashboard</h1>
-  <p>GitHub Pages 公開テストOK</p>
+
+<body>
+  <header>
+    <h1>FX Dashboard</h1>
+    <div class="sub" id="status">読み込み中…</div>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <div class="row">
+        <div>
+          <div class="pair">運用ルール（防衛モード）</div>
+          <div class="muted">「迷わない」ための閾値と分割比率</div>
+        </div>
+        <div class="pill" id="ruleSaved">未保存</div>
+      </div>
+
+      <div class="controls">
+        <div>
+          <label>期間（チャート）</label>
+          <select id="days">
+            <option value="90">90日</option>
+            <option value="180" selected>180日</option>
+            <option value="365">365日</option>
+          </select>
+        </div>
+        <div>
+          <label>判定の閾値（%）</label>
+          <input id="threshold" type="number" min="0.5" step="0.5" value="3.0" />
+        </div>
+        <div>
+          <label>分割（条件一致時に動かす割合 %）</label>
+          <input id="slicePct" type="number" min="5" step="5" value="25" />
+        </div>
+        <div>
+          <label>移動平均（長期）</label>
+          <select id="maLong">
+            <option value="60" selected>60日</option>
+            <option value="90">90日</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="btnrow">
+        <button id="save">ルール保存</button>
+        <button id="reload">更新</button>
+      </div>
+
+      <div class="footer">
+        データ：Frankfurter（ECB基準の終値ベース、営業日のみ更新）:contentReference[oaicite:1]{index=1}
+      </div>
+    </div>
+
+    <div class="grid" style="margin-top:12px;">
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="pair">USD/JPY</div>
+            <div class="muted" id="usd_date">—</div>
+          </div>
+          <div class="rate" id="usd_rate">—</div>
+        </div>
+        <div class="kpi">
+          <div class="k"><div class="v" id="usd_dev">—</div><div class="l">長期MA乖離（%）</div></div>
+          <div class="k"><div class="v" id="usd_signal">—</div><div class="l">今日の方針</div></div>
+          <div class="k"><div class="v" id="usd_action">—</div><div class="l">動かす目安</div></div>
+        </div>
+        <div class="chartwrap"><canvas id="usdChart"></canvas></div>
+        <div class="footer" id="usd_note"></div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="pair">EUR/JPY</div>
+            <div class="muted" id="eur_date">—</div>
+          </div>
+          <div class="rate" id="eur_rate">—</div>
+        </div>
+        <div class="kpi">
+          <div class="k"><div class="v" id="eur_dev">—</div><div class="l">長期MA乖離（%）</div></div>
+          <div class="k"><div class="v" id="eur_signal">—</div><div class="l">今日の方針</div></div>
+          <div class="k"><div class="v" id="eur_action">—</div><div class="l">動かす目安</div></div>
+        </div>
+        <div class="chartwrap"><canvas id="eurChart"></canvas></div>
+        <div class="footer" id="eur_note"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <div class="pair">読み方（アプリの思想）</div>
+      <div class="footer">
+        ・乖離が <b>+閾値%</b> 以上：円が相対的に安い（外貨が高い）→ <b>円転を少し検討</b><br/>
+        ・乖離が <b>-閾値%</b> 以下：円が相対的に高い（外貨が安い）→ <b>外貨を少し増やす検討</b><br/>
+        ・それ以外：<b>何もしない</b>（これが防衛運用の勝ち筋）
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const API = "https://api.frankfurter.dev/v1"; // 公開API（キー不要）:contentReference[oaicite:2]{index=2}
+  const LSKEY = "fxdash_rules_v1";
+
+  // ------- helpers -------
+  const fmt = (x, d=3) => (x==null || Number.isNaN(x)) ? "—" : Number(x).toFixed(d);
+  const pct = (x, d=1) => (x==null || Number.isNaN(x)) ? "—" : (x*100).toFixed(d) + "%";
+  const mean = arr => arr.reduce((a,b)=>a+b,0)/arr.length;
+
+  function movingAverage(series, window){
+    // series: [{t, v}]
+    const out = [];
+    const buf = [];
+    for (const p of series){
+      buf.push(p.v);
+      if (buf.length > window) buf.shift();
+      out.push(buf.length === window ? mean(buf) : null);
+    }
+    return out;
+  }
+
+  function classify(devAbsPct, thresholdPct){
+    // devAbsPct: (price - ma)/ma * 100
+    if (devAbsPct == null || Number.isNaN(devAbsPct)) return {label:"データ不足", cls:"warn"};
+    if (devAbsPct >= thresholdPct) return {label:"円転を少し検討", cls:"warn"};
+    if (devAbsPct <= -thresholdPct) return {label:"外貨を少し検討", cls:"good"};
+    return {label:"何もしない", cls:"good"};
+  }
+
+  function setPill(el, text, cls){
+    el.className = "pill " + (cls || "");
+    el.textContent = text;
+  }
+
+  async function fetchLatest(base){
+    const url = `${API}/latest?base=${encodeURIComponent(base)}&symbols=JPY`;
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) throw new Error("latest fetch failed");
+    return r.json();
+  }
+
+  async function fetchSeries(base, days){
+    // Frankfurter: /v1/YYYY-MM-DD..YYYY-MM-DD?base=USD&symbols=JPY :contentReference[oaicite:3]{index=3}
+    const end = new Date();
+    const start = new Date(end.getTime() - days*24*3600*1000);
+    const toISO = d => d.toISOString().slice(0,10);
+    const url = `${API}/${toISO(start)}..${toISO(end)}?base=${encodeURIComponent(base)}&symbols=JPY`;
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) throw new Error("series fetch failed");
+    return r.json();
+  }
+
+  function normalizeSeries(json){
+    // json.rates: { "YYYY-MM-DD": { "JPY": 123.45 }, ... }
+    const keys = Object.keys(json.rates).sort();
+    return keys.map(k => ({ t: k, v: json.rates[k].JPY }));
+  }
+
+  // ------- state / UI -------
+  const el = (id) => document.getElementById(id);
+
+  const ui = {
+    status: el("status"),
+    days: el("days"),
+    threshold: el("threshold"),
+    slicePct: el("slicePct"),
+    maLong: el("maLong"),
+    save: el("save"),
+    reload: el("reload"),
+    ruleSaved: el("ruleSaved"),
+  };
+
+  function loadRules(){
+    try {
+      const raw = localStorage.getItem(LSKEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch { return null; }
+  }
+  function saveRules(rules){
+    localStorage.setItem(LSKEY, JSON.stringify(rules));
+  }
+  function applyRulesToUI(r){
+    if (!r) return;
+    ui.days.value = String(r.days);
+    ui.threshold.value = String(r.thresholdPct);
+    ui.slicePct.value = String(r.slicePct);
+    ui.maLong.value = String(r.maLong);
+    setPill(ui.ruleSaved, "保存済み", "good");
+  }
+  function readRulesFromUI(){
+    return {
+      days: Number(ui.days.value),
+      thresholdPct: Number(ui.threshold.value),
+      slicePct: Number(ui.slicePct.value),
+      maLong: Number(ui.maLong.value),
+    };
+  }
+
+  // ------- charts -------
+  let usdChart, eurChart;
+
+  function makeChart(canvas, labels, price, ma20, maLong){
+    const ctx = canvas.getContext("2d");
+    return new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          { label: "レート", data: price, tension: 0.15, pointRadius: 0 },
+          { label: "MA20", data: ma20, tension: 0.15, pointRadius: 0 },
+          { label: `MA${maLong.length ? maLong.length : ""}`, data: maLong, tension: 0.15, pointRadius: 0 },
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: "#a9b4d0" } } },
+        scales: {
+          x: { ticks: { color: "#a9b4d0", maxTicksLimit: 6 }, grid: { color: "rgba(36,49,79,.35)" } },
+          y: { ticks: { color: "#a9b4d0" }, grid: { color: "rgba(36,49,79,.35)" } },
+        }
+      }
+    });
+  }
+
+  function updateOrCreateChart(which, labels, price, ma20, maLongArr){
+    const canvas = el(which === "USD" ? "usdChart" : "eurChart");
+    const existing = which === "USD" ? usdChart : eurChart;
+    if (!existing){
+      const ch = makeChart(canvas, labels, price, ma20, maLongArr);
+      if (which === "USD") usdChart = ch; else eurChart = ch;
+      return;
+    }
+    existing.data.labels = labels;
+    existing.data.datasets[0].data = price;
+    existing.data.datasets[1].data = ma20;
+    existing.data.datasets[2].data = maLongArr;
+    existing.update();
+  }
+
+  // ------- main render -------
+  async function renderPair(pairKey, base){
+    const rules = readRulesFromUI();
+    const days = rules.days;
+    const thresholdPct = rules.thresholdPct;
+    const slicePct = rules.slicePct;
+    const longW = rules.maLong;
+
+    // latest
+    const latest = await fetchLatest(base);
+    const latestRate = latest.rates.JPY; // base -> JPY
+    const latestDate = latest.date;
+
+    // series
+    const seriesJson = await fetchSeries(base, days);
+    const series = normalizeSeries(seriesJson);
+    const labels = series.map(p => p.t);
+    const price = series.map(p => p.v);
+
+    const ma20 = movingAverage(series, 20);
+    const maL  = movingAverage(series, longW);
+
+    const lastPrice = price[price.length - 1];
+    const lastMaL = maL[maL.length - 1];
+
+    const devPct = (lastMaL == null) ? null : ((lastPrice - lastMaL) / lastMaL) * 100;
+    const decision = classify(devPct, thresholdPct);
+
+    const devText = (devPct == null) ? "—" : devPct.toFixed(1) + "%";
+    const actionText = `${slicePct}% だけ`;
+
+    if (pairKey === "USD"){
+      el("usd_rate").textContent = fmt(latestRate, 3);
+      el("usd_date").textContent = `更新日: ${latestDate}`;
+      el("usd_dev").textContent = devText;
+      el("usd_signal").textContent = decision.label;
+      el("usd_action").textContent = actionText;
+      el("usd_note").textContent = `長期MA(${longW}日)基準。乖離が ±${thresholdPct}% を超えたら分割で動かす。`;
+      updateOrCreateChart("USD", labels, price, ma20, maL);
+    } else {
+      el("eur_rate").textContent = fmt(latestRate, 3);
+      el("eur_date").textContent = `更新日: ${latestDate}`;
+      el("eur_dev").textContent = devText;
+      el("eur_signal").textContent = decision.label;
+      el("eur_action").textContent = actionText;
+      el("eur_note").textContent = `長期MA(${longW}日)基準。乖離が ±${thresholdPct}% を超えたら分割で動かす。`;
+      updateOrCreateChart("EUR", labels, price, ma20, maL);
+    }
+
+    return { latestDate };
+  }
+
+  async function renderAll(){
+    ui.status.textContent = "更新中…";
+    const t0 = performance.now();
+    try {
+      const [usd, eur] = await Promise.all([
+        renderPair("USD", "USD"),
+        renderPair("EUR", "EUR")
+      ]);
+      const t1 = performance.now();
+      ui.status.textContent = `OK（USD/EUR 更新日: ${usd.latestDate} / ${eur.latestDate}）・表示まで ${(t1 - t0).toFixed(0)}ms`;
+    } catch (e){
+      console.error(e);
+      ui.status.textContent = "取得に失敗しました。電波状況 or API応答を確認してください。";
+    }
+  }
+
+  // ------- init -------
+  const stored = loadRules();
+  if (stored) applyRulesToUI(stored);
+
+  ui.save.addEventListener("click", () => {
+    const r = readRulesFromUI();
+    saveRules(r);
+    setPill(ui.ruleSaved, "保存済み", "good");
+  });
+
+  ui.reload.addEventListener("click", () => renderAll());
+
+  // ルール変更時に「未保存」に戻す（うっかり防止）
+  ["days","threshold","slicePct","maLong"].forEach(id => {
+    el(id).addEventListener("change", () => setPill(ui.ruleSaved, "未保存", "warn"));
+    el(id).addEventListener("input",  () => setPill(ui.ruleSaved, "未保存", "warn"));
+  });
+
+  renderAll();
+})();
+</script>
 </body>
 </html>
